@@ -1,6 +1,8 @@
 # -*- encoding:utf-8 -*-
 
 import httplib,urlparse,cgi
+import urllib
+import urllib2
 import time
 import oauth
 
@@ -11,6 +13,15 @@ AUTH_HOST = 'http://www.douban.com'
 REQUEST_TOKEN_URL = AUTH_HOST+'/service/auth/request_token'
 ACCESS_TOKEN_URL = AUTH_HOST+'/service/auth/access_token'
 AUTHORIZATION_URL = AUTH_HOST+'/service/auth/authorize'
+
+
+def add_params_to_url(url, params):
+    url_parts = list(urlparse.urlparse(url))
+    query = dict(urlparse.parse_qsl(url_parts[4]))
+    query.update(params)
+    url_parts[4] = urllib.urlencode(query)
+    return urlparse.urlunparse(url_parts)
+
 
 class OAuthClient:
     def __init__(self, server='www.douban.com', key=None, secret=None):
@@ -39,12 +50,14 @@ class OAuthClient:
             print 'get access token failed'
             return False
 
+
     def fetch_token(self, oauth_request):
-        connection = httplib.HTTPConnection("%s:%d" % (self.server, 80))
-        connection.request('GET', urlparse.urlparse(oauth_request.http_url).path,
-            headers=oauth_request.to_header())
-        response = connection.getresponse()
-        r = response.read()
+        url = AUTH_HOST + urlparse.urlparse(oauth_request.http_url).path
+        url = add_params_to_url(url, oauth_request.parameters)
+        handler = urllib2.urlopen(url)
+
+        r = handler.read()
+
         try:
             token = oauth.OAuthToken.from_string(r)
             params = cgi.parse_qs(r, keep_blank_values=False)
@@ -102,7 +115,8 @@ def test():
     API_KEY = '' 
     SECRET = ''
     client = OAuthClient(key=API_KEY, secret=SECRET)
-    client.login()
+    ret = client.login()
+    print ret
     res = client.access_resource('GET', 'http://api.douban.com/test?a=b&c=d').read()
     print res
 
